@@ -1,0 +1,7 @@
+.venv/
+.pio/
+__pycache__/
+*.py[cod]
+config/user.json
+logs/
+.DS_Store
