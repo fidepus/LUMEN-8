@@ -1,0 +1,75 @@
+
+{
+  "api": {
+    "url": "http://localhost:3000",
+    "timeout": 3
+  },
+  "controller": {
+    "default_parameter": "exposure",
+    "parameters": {
+      "exposure": {
+        "label": "Exposure",
+        "short_label": "EV",
+        "api_name": "Exposure2012",
+        "step": 0.05,
+        "enabled": true
+      },
+      "contrast": {
+        "label": "Contrast",
+        "short_label": "CO",
+        "api_name": "Contrast2012",
+        "step": 1,
+        "enabled": true
+      },
+      "highlights": {
+        "label": "Highlights",
+        "short_label": "HI",
+        "api_name": "Highlights2012",
+        "step": 1,
+        "enabled": true
+      },
+      "shadows": {
+        "label": "Shadows",
+        "short_label": "SH",
+        "api_name": "Shadows2012",
+        "step": 1,
+        "enabled": true
+      },
+      "whites": {
+        "label": "Whites",
+        "short_label": "WH",
+        "api_name": "Whites2012",
+        "step": 1,
+        "enabled": true
+      },
+      "blacks": {
+        "label": "Blacks",
+        "short_label": "BL",
+        "api_name": "Blacks2012",
+        "step": 1,
+        "enabled": true
+      },
+      "temperature": {
+        "label": "Temperature",
+        "short_label": "TE",
+        "api_name": "Temperature",
+        "step": 50,
+        "enabled": true
+      },
+      "saturation": {
+        "label": "Saturation",
+        "short_label": "SA",
+        "api_name": "Saturation",
+        "step": 1,
+        "enabled": true
+      }
+    }
+  },
+  "usb": {
+    "baud_rate": 115200,
+    "reconnect_interval": 2,
+    "vendor_id": null,
+    "product_id": null,
+    "serial_number": null
+  }
+}
