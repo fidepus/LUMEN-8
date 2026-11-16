@@ -1,6 +1,6 @@
 # LUMEN-8
 
-**Lightroom Utility for Manual Editing: 8 Controls**
+**Lightroom Utility for Manual Editing and Navigation: 8 Controls**
 
 LUMEN-8 is an open-source, DIY USB hardware controller for adjusting image-development parameters in Adobe Lightroom. It combines eight dedicated parameter buttons, a rotary encoder and a small OLED status display in a compact, 3D-printable enclosure.
 
