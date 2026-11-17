@@ -97,6 +97,7 @@ LUMEN-8/
 │       └── protocol.h
 ├── mac/
 │   ├── bridge.py
+│   ├── device_discovery.py
 │   ├── config.py
 │   ├── lightroom.py
 │   └── logger.py
@@ -214,7 +215,15 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 - [ ] Document installation and troubleshooting in more detail
 - [ ] Consider current-value feedback and additional interaction modes
 
-## Tests\n\nRun the host-side discovery protocol tests from the repository root:\n\n```bash\npython3 -m unittest discover -s tests -v\n```\n\nThese tests cover response parsing, protocol-version rejection, optional USB filters and probe retries. Physical USB reconnection still needs validation with the target hardware.\n\n## Third-party software
+## Tests
+
+Run the host-side discovery protocol tests from the repository root:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+These tests cover response parsing, protocol-version rejection, optional USB filters and probe retries. Physical USB reconnection still needs validation with the target hardware.\n\n## Third-party software
 
 LUMEN-8 uses the [lightroom-controller](https://github.com/electerious/lightroom-controller) project by electerious. That project is distributed under the MIT License. See its repository for its license and notices.
 
