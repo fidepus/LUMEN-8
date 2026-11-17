@@ -211,7 +211,8 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 
 ## Roadmap
 
-- [x] Implement versioned protocol-based USB identification and automatic re-discovery after connection loss\n- [ ] Verify discovery with the physical Pro Micro and at least one alternative USB-capable Arduino
+- [x] Implement versioned protocol-based USB identification and automatic re-discovery after connection loss
+- [ ] Verify discovery with the physical Pro Micro and at least one alternative USB-capable Arduino
 - [ ] Package the bridge as a macOS `launchd` LaunchAgent: start at login, restart after failures, manage logs, and provide install/uninstall scripts
 - [ ] Complete the eight-button perfboard assembly
 - [ ] Validate all eight buttons and encoder adjustments end to end in Lightroom
