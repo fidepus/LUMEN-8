@@ -201,9 +201,12 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 - The bridge expects the firmware to emit input events; it does not upload configuration to the board at runtime.
 - Current-value readback from Lightroom is not implemented.
 - The encoder push switch currently reports a press event; no reset action is assigned yet.
+- The bridge has an initial `--auto` discovery/reconnect mode. It currently requires at least one USB identifier (`vendor_id`, `product_id` or `serial_number`) to be configured; the default configuration does not set these values.
 
 ## Roadmap
 
+- [ ] Make USB discovery independent of macOS device-node names such as `/dev/cu.usbmodemXXX`; identify the controller using stable USB metadata and reconnect after unplug/replug or port renumbering
+- [ ] Package the bridge as a macOS `launchd` LaunchAgent: start at login, restart after failures, manage logs, and provide install/uninstall scripts
 - [ ] Complete the eight-button perfboard assembly
 - [ ] Validate all eight buttons and encoder adjustments end to end in Lightroom
 - [ ] Finalize the enclosure and add printable CAD/STL files
