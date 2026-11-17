@@ -228,7 +228,9 @@ Run the host-side discovery protocol tests from the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-These tests cover response parsing, protocol-version rejection, optional USB filters and probe retries. Physical USB reconnection still needs validation with the target hardware.\n\n## Third-party software
+These tests cover response parsing, protocol-version rejection, optional USB filters and probe retries. Physical USB reconnection still needs validation with the target hardware.
+
+## Third-party software
 
 LUMEN-8 uses the [lightroom-controller](https://github.com/electerious/lightroom-controller) project by electerious. That project is distributed under the MIT License. See its repository for its license and notices.
 
