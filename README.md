@@ -199,10 +199,11 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 
 - The firmware currently uses the U8g2 library with an SH1106 display driver.
 - USB serial runs at 115200 baud.
-- The bridge identifies the device with a small ASCII request/response (`LUMEN8:IDENTIFY?` / `LUMEN8:HELLO:1:<firmware-version>`). This is separate from configuration provisioning; no settings are transferred at runtime.\n- Automatic discovery considers USB serial devices regardless of their VID/PID. Optional VID/PID/serial-number filters can be set in `config/user.json`, but a valid LUMEN-8 protocol response is always required.\n- The bridge keeps DTR and RTS inactive while probing, to avoid triggering the reset behavior used by some Arduino boards.
+- The bridge identifies the device with a small ASCII request/response (`LUMEN8:IDENTIFY?` / `LUMEN8:HELLO:1:<firmware-version>`). This is separate from configuration provisioning; no settings are transferred at runtime.
+- Automatic discovery probes USB serial interfaces regardless of their specific VID/PID values. Optional VID/PID/serial-number filters can be set in `config/user.json`; a valid LUMEN-8 protocol response is always required.
+- The bridge keeps DTR and RTS inactive while probing, to avoid triggering the reset behavior used by some Arduino boards.
 - Current-value readback from Lightroom is not implemented.
 - The encoder push switch currently reports a press event; no reset action is assigned yet.
-- The bridge has an initial `--auto` discovery/reconnect mode. It currently requires at least one USB identifier (`vendor_id`, `product_id` or `serial_number`) to be configured; the default configuration does not set these values.
 
 ## Roadmap
 
