@@ -106,7 +106,9 @@ LUMEN-8/
 │   └── provision.py
 ├── .gitignore
 ├── README.md
-└── requirements.txt
+├── requirements.txt
+└── tests/
+    └── test_device_discovery.py
 ```
 
 The exact contents may change as development continues.
@@ -193,6 +195,8 @@ Parameter configuration includes:
 - `step`: adjustment amount per encoder movement
 - `enabled`: whether the parameter is active
 
+The optional USB `vendor_id`, `product_id` and `serial_number` fields act only as discovery filters. Leave them `null` to support different Arduino-compatible USB serial devices. A matching LUMEN-8 identity response is still required.
+
 The firmware uses generated, compile-time configuration rather than parsing JSON at runtime. This keeps memory use on the ATmega32U4 lower and makes the firmware build deterministic.
 
 ## Development notes
@@ -200,7 +204,7 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 - The firmware currently uses the U8g2 library with an SH1106 display driver.
 - USB serial runs at 115200 baud.
 - The bridge identifies the device with a small ASCII request/response (`LUMEN8:IDENTIFY?` / `LUMEN8:HELLO:1:<firmware-version>`). This is separate from configuration provisioning; no settings are transferred at runtime.
-- Automatic discovery probes USB serial interfaces regardless of their specific VID/PID values. Optional VID/PID/serial-number filters can be set in `config/user.json`; a valid LUMEN-8 protocol response is always required.
+- Automatic discovery probes USB serial interfaces with USB descriptor metadata. It does not require specific VID/PID values or a particular serial number. Optional VID/PID/serial-number filters can be set in `config/user.json`; a valid LUMEN-8 protocol response is always required.
 - The bridge keeps DTR and RTS inactive while probing, to avoid triggering the reset behavior used by some Arduino boards.
 - Current-value readback from Lightroom is not implemented.
 - The encoder push switch currently reports a press event; no reset action is assigned yet.
