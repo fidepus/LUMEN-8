@@ -168,7 +168,7 @@ pio run -e promicro
 pio run -e promicro -t upload --upload-port /dev/cu.usbmodemXXXX
 ```
 
-Replace the serial port with the port assigned to your board. On macOS, it commonly appears as `/dev/cu.usbmodem...`.
+The `--auto` mode scans USB serial devices and identifies LUMEN-8 through its firmware response. It does not depend on a fixed `/dev/cu.usbmodem...` name or a particular Arduino VID/PID. For diagnostics, a fixed port can still be selected with `--serial /dev/cu.usbmodemXXXX`.
 
 ### 6. Start the macOS bridge
 
@@ -176,7 +176,7 @@ From the repository root:
 
 ```bash
 source .venv/bin/activate
-python mac/bridge.py --serial /dev/cu.usbmodemXXXX
+python mac/bridge.py --auto
 ```
 
 Make sure Adobe Lightroom and `lightroom-controller` are running and that the API URL in your configuration is correct.
@@ -198,14 +198,14 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 
 - The firmware currently uses the U8g2 library with an SH1106 display driver.
 - USB serial runs at 115200 baud.
-- The bridge expects the firmware to emit input events; it does not upload configuration to the board at runtime.
+- The bridge identifies the device with a small ASCII request/response (`LUMEN8:IDENTIFY?` / `LUMEN8:HELLO:1:<firmware-version>`). This is separate from configuration provisioning; no settings are transferred at runtime.\n- Automatic discovery considers USB serial devices regardless of their VID/PID. Optional VID/PID/serial-number filters can be set in `config/user.json`, but a valid LUMEN-8 protocol response is always required.\n- The bridge keeps DTR and RTS inactive while probing, to avoid triggering the reset behavior used by some Arduino boards.
 - Current-value readback from Lightroom is not implemented.
 - The encoder push switch currently reports a press event; no reset action is assigned yet.
 - The bridge has an initial `--auto` discovery/reconnect mode. It currently requires at least one USB identifier (`vendor_id`, `product_id` or `serial_number`) to be configured; the default configuration does not set these values.
 
 ## Roadmap
 
-- [ ] Make USB discovery independent of macOS device-node names such as `/dev/cu.usbmodemXXX`; identify the controller using stable USB metadata and reconnect after unplug/replug or port renumbering
+- [x] Implement versioned protocol-based USB identification and automatic re-discovery after connection loss\n- [ ] Verify discovery with the physical Pro Micro and at least one alternative USB-capable Arduino
 - [ ] Package the bridge as a macOS `launchd` LaunchAgent: start at login, restart after failures, manage logs, and provide install/uninstall scripts
 - [ ] Complete the eight-button perfboard assembly
 - [ ] Validate all eight buttons and encoder adjustments end to end in Lightroom
@@ -214,7 +214,7 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 - [ ] Document installation and troubleshooting in more detail
 - [ ] Consider current-value feedback and additional interaction modes
 
-## Third-party software
+## Tests\n\nRun the host-side discovery protocol tests from the repository root:\n\n```bash\npython3 -m unittest discover -s tests -v\n```\n\nThese tests cover response parsing, protocol-version rejection, optional USB filters and probe retries. Physical USB reconnection still needs validation with the target hardware.\n\n## Third-party software
 
 LUMEN-8 uses the [lightroom-controller](https://github.com/electerious/lightroom-controller) project by electerious. That project is distributed under the MIT License. See its repository for its license and notices.
 

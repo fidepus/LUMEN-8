@@ -3,7 +3,7 @@
  * LUMEN-8
  * Lightroom Utility for Manual Editing: 8 Controls
  *
- * Firmware Version: 0.6.0
+ * Firmware Version: 0.6.0 (from build configuration)
  * Board: Arduino Pro Micro ATmega32U4, 5V / 16MHz
  * ============================================================
  */

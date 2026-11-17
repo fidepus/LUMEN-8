@@ -1,15 +1,16 @@
+#!/usr/bin/env python3
 
 # ============================================================
 # LUMEN-8
 # Lightroom Utility for Manual Editing: 8 Controls
 #
-# Mac Bridge
-# Version: 0.5.0
+# macOS Bridge
+# Version: 0.6.0
 #
 # Operating modes:
 #   --simulate       Read JSON input from the terminal
-#   --serial PORT    Connect to a specific serial port
-#   --auto           Automatically discover and reconnect
+#   --serial PORT    Connect to a specific port (diagnostics)
+#   --auto           Discover and reconnect automatically
 # ============================================================
 
 import argparse
@@ -19,21 +20,14 @@ import time
 import serial
 from serial.tools import list_ports
 
-from lightroom import select, adjust_selected
-from config import (
-    USB_CONFIG,
-    PARAMETERS,
-    DEFAULT_PARAMETER
+from device_discovery import (
+    identify_controller,
+    is_usb_serial_port,
+    matches_usb_filters,
 )
+from lightroom import select, adjust_selected
+from config import USB_CONFIG
 from logger import logger
-
-
-# ------------------------------------------------------------
-# Serial protocol
-# ------------------------------------------------------------
-
-# Configuration is provisioned into firmware before installation.
-# Runtime USB communication carries input events only.
 
 
 # ------------------------------------------------------------
@@ -46,7 +40,6 @@ def handle_message(message: dict):
     event = message.get("event")
 
     if event == "select":
-
         parameter = message.get("parameter")
 
         if not isinstance(parameter, str):
@@ -56,12 +49,10 @@ def handle_message(message: dict):
         try:
             select(parameter)
             logger.info(f"Selected parameter: {parameter}")
-
         except ValueError as error:
             logger.warning(f"Could not select parameter: {error}")
 
     elif event == "delta":
-
         delta = message.get("delta")
 
         if type(delta) is not int or delta not in (-1, 1):
@@ -72,10 +63,8 @@ def handle_message(message: dict):
         adjust_selected(delta)
 
     elif event == "press":
-
         control = message.get("control")
         logger.info(f"Button pressed: {control}")
-
         # Button actions will be implemented later.
 
     else:
@@ -87,13 +76,10 @@ def process_line(line: str):
 
     try:
         message = json.loads(line)
-
         if not isinstance(message, dict):
             logger.warning("Received message is not a JSON object.")
             return
-
         handle_message(message)
-
     except json.JSONDecodeError as error:
         logger.warning(f"Invalid JSON received: {error}")
 
@@ -106,129 +92,158 @@ def run_simulation():
     """Read test messages from the terminal."""
 
     logger.info("LUMEN-8 simulation mode started.")
-
     print("Enter JSON messages. Press Ctrl+C to exit.\n")
 
     try:
         while True:
-
             line = input("> ").strip()
-
             if line:
                 process_line(line)
-
     except KeyboardInterrupt:
         logger.info("Simulation mode stopped.")
 
 
 # ------------------------------------------------------------
-# USB device discovery
+# USB discovery and identification
 # ------------------------------------------------------------
 
-def find_controller_port():
+def open_serial_connection(port_name: str):
     """
-    Find the controller using configured USB identifiers.
+    Open a serial port without asserting DTR/RTS.
 
-    No port is selected unless at least one identifier
-    has been configured.
+    Some Arduino-compatible boards reset when DTR changes state. Keeping both
+    lines inactive avoids triggering that reset just because auto-discovery
+    probes a candidate port.
     """
 
-    vendor_id = USB_CONFIG.get("vendor_id")
-    product_id = USB_CONFIG.get("product_id")
-    serial_number = USB_CONFIG.get("serial_number")
+    connection = serial.Serial(
+        port=None,
+        baudrate=USB_CONFIG["baud_rate"],
+        timeout=0.20,
+        write_timeout=1,
+    )
+    connection.dtr = False
+    connection.rts = False
+    connection.port = port_name
+    connection.open()
+    return connection
 
-    if (
-        vendor_id is None
-        and product_id is None
-        and serial_number is None
-    ):
-        return None
 
-    for port in list_ports.comports():
+def probe_controller_port(port_name: str):
+    """
+    Open a candidate port and identify LUMEN-8 using the runtime protocol.
 
-        if vendor_id is not None and port.vid != vendor_id:
-            continue
+    Returns (open_connection, identity) on success, or None when the device
+    does not answer as a supported LUMEN-8 controller.
+    """
 
-        if product_id is not None and port.pid != product_id:
-            continue
+    connection = open_serial_connection(port_name)
 
-        if (
-            serial_number is not None
-            and port.serial_number != serial_number
-        ):
-            continue
+    try:
+        # Allow USB CDC enumeration/firmware startup to settle. DTR is held low.
+        time.sleep(0.15)
+        identity = identify_controller(connection)
 
-        return port.device
+        if identity is None:
+            connection.close()
+            return None
 
-    return None
+        return connection, identity
+
+    except Exception:
+        if connection.is_open:
+            connection.close()
+        raise
+
+
+def configured_usb_port(port_info) -> bool:
+    """Return whether a USB serial port passes optional user filters."""
+
+    return (
+        is_usb_serial_port(port_info)
+        and matches_usb_filters(port_info, USB_CONFIG)
+    )
+
+
+def current_port_names():
+    """Return the currently enumerated serial device names."""
+
+    return {port.device for port in list_ports.comports()}
 
 
 # ------------------------------------------------------------
-# Serial connection
+# Serial event loop
 # ------------------------------------------------------------
 
-def read_serial_connection(port_name: str):
-    """
-    Open one serial connection, perform the handshake
-    and process incoming controller messages.
-    """
+def read_serial_connection(connection, port_name: str, identity):
+    """Process input events on an already identified, open controller."""
 
-    baud_rate = USB_CONFIG["baud_rate"]
+    logger.info(f"LUMEN-8 connected on {port_name}.")
+    logger.info(
+        "Controller identified: protocol v%s, firmware %s.",
+        identity.protocol_version,
+        identity.firmware_version,
+    )
+    logger.info("LUMEN-8 is ready.")
 
-    with serial.Serial(
-        port=port_name,
-        baudrate=baud_rate,
-        timeout=1,
-        write_timeout=2
-    ) as connection:
+    last_port_check = time.monotonic()
 
-        logger.info(f"LUMEN-8 connected on {port_name}.")
+    while True:
+        raw_line = connection.readline()
 
-        # Opening the USB serial port may reset the Pro Micro.
-        # Allow its firmware to finish starting before processing events.
-        time.sleep(2)
-        logger.info("LUMEN-8 is ready.")
+        if not raw_line:
+            # Some USB CDC drivers return an empty timeout instead of raising
+            # when a device is unplugged. Check enumeration periodically.
+            now = time.monotonic()
+            if now - last_port_check >= 1.0:
+                last_port_check = now
+                if port_name not in current_port_names():
+                    raise serial.SerialException(
+                        f"USB device disappeared: {port_name}"
+                    )
+            continue
 
-        while True:
+        try:
+            line = raw_line.decode("utf-8").strip()
+            if line:
+                logger.debug(f"Received: {line}")
+                process_line(line)
+        except UnicodeDecodeError:
+            logger.warning("Received invalid serial data.")
 
-            raw_line = connection.readline()
 
-            if not raw_line:
-                continue
-
-            try:
-                line = raw_line.decode("utf-8").strip()
-
-                if line:
-                    logger.debug(f"Received: {line}")
-                    process_line(line)
-
-            except UnicodeDecodeError:
-                logger.warning("Received invalid serial data.")
+def close_connection(connection):
+    if connection is not None and connection.is_open:
+        connection.close()
 
 
 def run_serial(port_name: str):
-    """Connect to a fixed port and retry if the connection fails."""
+    """Connect to a manually specified port and retry on that same path."""
 
     reconnect_interval = USB_CONFIG["reconnect_interval"]
-
-    logger.info(f"Serial mode started on {port_name}.")
+    logger.info(f"Fixed serial mode started on {port_name}.")
 
     try:
         while True:
-
+            connection = None
             try:
-                read_serial_connection(port_name)
+                result = probe_controller_port(port_name)
+                if result is None:
+                    logger.warning(f"No supported LUMEN-8 response on {port_name}.")
+                    time.sleep(reconnect_interval)
+                    continue
 
-            except serial.SerialException as error:
+                connection, identity = result
+                read_serial_connection(connection, port_name, identity)
 
-                logger.warning(f"Serial connection lost: {error}")
-
+            except (serial.SerialException, OSError) as error:
+                logger.warning(f"Serial connection interrupted: {error}")
                 logger.info(
                     f"Retrying connection in {reconnect_interval} seconds."
                 )
-
                 time.sleep(reconnect_interval)
+            finally:
+                close_connection(connection)
 
     except KeyboardInterrupt:
         logger.info("Serial mode stopped.")
@@ -240,45 +255,63 @@ def run_serial(port_name: str):
 
 def run_auto():
     """
-    Automatically discover the controller and reconnect.
+    Discover LUMEN-8 by protocol response, not by a fixed device-node name.
 
-    After a connection failure, the port is searched again.
-    This also handles devices that reappear under a new port name.
+    Any USB serial device can be a candidate, regardless of its VID/PID or
+    serial number. Optional values in config/default.json can narrow the scan,
+    but a matching LUMEN-8 HELLO response is always required.
     """
 
     reconnect_interval = USB_CONFIG["reconnect_interval"]
     waiting_logged = False
 
-    logger.info("Automatic USB discovery started.")
+    logger.info("Automatic LUMEN-8 USB discovery started.")
 
     try:
         while True:
+            found_controller = False
 
-            port_name = find_controller_port()
+            for port_info in list_ports.comports():
+                if not configured_usb_port(port_info):
+                    continue
 
-            if port_name is None:
+                port_name = port_info.device
+                logger.debug(
+                    "Probing USB serial device %s (VID=%s, PID=%s).",
+                    port_name,
+                    port_info.vid,
+                    port_info.pid,
+                )
 
+                connection = None
+                try:
+                    result = probe_controller_port(port_name)
+                    if result is None:
+                        continue
+
+                    connection, identity = result
+                    found_controller = True
+                    waiting_logged = False
+
+                    try:
+                        read_serial_connection(connection, port_name, identity)
+                    except (serial.SerialException, OSError) as error:
+                        logger.warning(f"USB connection interrupted: {error}")
+                        logger.info("Searching for LUMEN-8 again.")
+                    finally:
+                        close_connection(connection)
+
+                    # A connected controller disconnected; restart the scan.
+                    break
+
+                except (serial.SerialException, OSError) as error:
+                    logger.debug("Could not probe %s: %s", port_name, error)
+                    close_connection(connection)
+
+            if not found_controller:
                 if not waiting_logged:
                     logger.info("Waiting for LUMEN-8 controller.")
-
-                logger.debug("No matching USB controller found.")
-
-                waiting_logged = True
-
-                time.sleep(reconnect_interval)
-                continue
-
-            waiting_logged = False
-
-            logger.info(f"Controller discovered: {port_name}.")
-
-            try:
-                read_serial_connection(port_name)
-
-            except serial.SerialException as error:
-
-                logger.warning(f"USB connection interrupted: {error}")
-                logger.info("Searching for controller again.")
+                    waiting_logged = True
 
                 time.sleep(reconnect_interval)
 
@@ -291,46 +324,37 @@ def run_auto():
 # ------------------------------------------------------------
 
 def main():
-
     parser = argparse.ArgumentParser(
         description="LUMEN-8 Lightroom Controller Bridge"
     )
 
     mode = parser.add_mutually_exclusive_group(required=True)
-
     mode.add_argument(
         "--simulate",
         action="store_true",
-        help="Read JSON input from the terminal"
+        help="Read JSON input from the terminal",
     )
-
     mode.add_argument(
         "--serial",
         metavar="PORT",
-        help="Connect to a specific serial port"
+        help="Connect to a specific serial port (diagnostics)",
     )
-
     mode.add_argument(
         "--auto",
         action="store_true",
-        help="Automatically discover the USB controller"
+        help="Identify LUMEN-8 on USB and reconnect automatically",
     )
 
     args = parser.parse_args()
-
     logger.info("LUMEN-8 Bridge started.")
 
     try:
-
         if args.simulate:
             run_simulation()
-
         elif args.serial:
             run_serial(args.serial)
-
         elif args.auto:
             run_auto()
-
     finally:
         logger.info("LUMEN-8 Bridge stopped.")
 
