@@ -84,10 +84,10 @@ LUMEN-8/
 ├── config/
 │   ├── default.json
 │   └── user.json              # local file; do not commit
-├── docs/
 ├── firmware/
 │   ├── platformio.ini
 │   └── src/
+│       ├── generated_config.h  # generated locally; not committed
 │       ├── main.cpp
 │       ├── input.cpp
 │       ├── input.h
@@ -156,7 +156,7 @@ Edit `config/user.json` as needed. This file is intentionally excluded from vers
 python scripts/provision.py
 ```
 
-The provisioning script reads the default and user configuration and generates `firmware/src/generated_config.h`. Re-run it after changing parameter or hardware configuration, then rebuild and flash the firmware.
+The provisioning script reads the default and user configuration and generates `firmware/src/generated_config.h`. This generated file is intentionally excluded from Git because it can contain local configuration choices. Run provisioning before the first firmware build and again after changing parameter or hardware configuration, then rebuild and flash the firmware.
 
 ### 5. Build and upload firmware
 

@@ -5,3 +5,7 @@ __pycache__/
 config/user.json
 logs/
 .DS_Store
+
+# Generated from local configuration; recreate with scripts/provision.py
+/firmware/src/generated_config.h
+/src/generated_config.h
