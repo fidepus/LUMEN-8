@@ -107,6 +107,22 @@ def matches_usb_filters(port_info, usb_config: dict) -> bool:
     return True
 
 
+def prepare_serial_connection(connection, port_name: str):
+    """Open a CDC serial port with DTR asserted and RTS inactive.
+
+    Native USB CDC implementations such as the ATmega32U4 Arduino core only
+    transmit from ``Serial`` while the host has an active control-line state.
+    Keeping DTR low lets the board receive requests but can silently discard
+    its identity response.
+    """
+
+    connection.rts = False
+    connection.dtr = True
+    connection.port = port_name
+    connection.open()
+    return connection
+
+
 def identify_controller(
     connection,
     attempts: int = DEFAULT_PROBE_ATTEMPTS,

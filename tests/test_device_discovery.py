@@ -13,6 +13,7 @@ from device_discovery import (  # noqa: E402
     is_usb_serial_port,
     matches_usb_filters,
     parse_identity_response,
+    prepare_serial_connection,
 )
 
 
@@ -68,6 +69,17 @@ class UsbCandidateTests(unittest.TestCase):
 
 
 class IdentifyRequestTests(unittest.TestCase):
+    def test_opens_cdc_serial_with_dtr_asserted_and_rts_inactive(self):
+        connection = Mock()
+
+        result = prepare_serial_connection(connection, "/dev/cu.usbmodem-test")
+
+        self.assertIs(result, connection)
+        self.assertEqual(connection.port, "/dev/cu.usbmodem-test")
+        self.assertTrue(connection.dtr)
+        self.assertFalse(connection.rts)
+        connection.open.assert_called_once_with()
+
     def test_sends_minimal_request_and_accepts_valid_hello(self):
         connection = Mock()
         connection.readline.return_value = b"LUMEN8:HELLO:1:0.6.0\n"

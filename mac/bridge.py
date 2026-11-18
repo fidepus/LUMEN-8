@@ -24,6 +24,7 @@ from device_discovery import (
     identify_controller,
     is_usb_serial_port,
     matches_usb_filters,
+    prepare_serial_connection,
 )
 from lightroom import select, adjust_selected
 from config import USB_CONFIG
@@ -109,11 +110,10 @@ def run_simulation():
 
 def open_serial_connection(port_name: str):
     """
-    Open a serial port without asserting DTR/RTS.
+    Open the native USB CDC serial connection required by the Pro Micro.
 
-    Some Arduino-compatible boards reset when DTR changes state. Keeping both
-    lines inactive avoids triggering that reset just because auto-discovery
-    probes a candidate port.
+    DTR must be asserted for the ATmega32U4 CDC implementation to transmit the
+    handshake response. RTS stays inactive.
     """
 
     connection = serial.Serial(
@@ -122,11 +122,7 @@ def open_serial_connection(port_name: str):
         timeout=0.20,
         write_timeout=1,
     )
-    connection.dtr = False
-    connection.rts = False
-    connection.port = port_name
-    connection.open()
-    return connection
+    return prepare_serial_connection(connection, port_name)
 
 
 def probe_controller_port(port_name: str):
@@ -263,19 +259,22 @@ def run_auto():
     """
 
     reconnect_interval = USB_CONFIG["reconnect_interval"]
-    waiting_logged = False
+    last_wait_message = None
 
     logger.info("Automatic LUMEN-8 USB discovery started.")
 
     try:
         while True:
             found_controller = False
+            candidate_ports = []
+            unidentified_ports = []
 
             for port_info in list_ports.comports():
                 if not configured_usb_port(port_info):
                     continue
 
                 port_name = port_info.device
+                candidate_ports.append(port_name)
                 logger.debug(
                     "Probing USB serial device %s (VID=%s, PID=%s).",
                     port_name,
@@ -287,11 +286,12 @@ def run_auto():
                 try:
                     result = probe_controller_port(port_name)
                     if result is None:
+                        unidentified_ports.append(port_name)
                         continue
 
                     connection, identity = result
                     found_controller = True
-                    waiting_logged = False
+                    last_wait_message = None
 
                     try:
                         read_serial_connection(connection, port_name, identity)
@@ -305,13 +305,27 @@ def run_auto():
                     break
 
                 except (serial.SerialException, OSError) as error:
+                    unidentified_ports.append(port_name)
                     logger.debug("Could not probe %s: %s", port_name, error)
                     close_connection(connection)
 
             if not found_controller:
-                if not waiting_logged:
-                    logger.info("Waiting for LUMEN-8 controller.")
-                    waiting_logged = True
+                if not candidate_ports:
+                    wait_message = (
+                        "No USB serial candidates match the configured filters; "
+                        "waiting for LUMEN-8 controller."
+                    )
+                elif unidentified_ports:
+                    wait_message = (
+                        "USB serial candidate(s) did not answer the LUMEN-8 "
+                        "handshake: " + ", ".join(unidentified_ports)
+                    )
+                else:
+                    wait_message = "Waiting for LUMEN-8 controller."
+
+                if wait_message != last_wait_message:
+                    logger.info(wait_message)
+                    last_wait_message = wait_message
 
                 time.sleep(reconnect_interval)
 
