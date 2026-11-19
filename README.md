@@ -103,7 +103,10 @@ LUMEN-8/
 │   └── logger.py
 ├── scripts/
 │   ├── test_lightroom_api.sh
-│   └── provision.py
+│   ├── provision.py
+│   ├── install_launch_agent.sh
+│   ├── uninstall_launch_agent.sh
+│   └── launch_agent.py
 ├── .gitignore
 ├── README.md
 ├── requirements.txt
@@ -184,6 +187,22 @@ python mac/bridge.py --auto
 
 Make sure Adobe Lightroom and `lightroom-controller` are running and that the API URL in your configuration is correct.
 
+### Start the bridge automatically at login
+
+After setting up the Python environment and USB controller, install the per-user LaunchAgent with:
+
+```bash
+sh scripts/install_launch_agent.sh
+```
+
+It starts `mac/bridge.py --auto` at login and launchd restarts it after an exit. The bridge reconnects to the controller itself after USB connection loss. Rotating bridge logs are stored in `~/Library/Logs/LUMEN-8/`.
+
+Remove the LaunchAgent with:
+
+```bash
+sh scripts/uninstall_launch_agent.sh
+```
+
 ## Configuration
 
 The shared defaults live in `config/default.json`. Local overrides belong in `config/user.json`, which must not be committed.
@@ -205,17 +224,17 @@ The firmware uses generated, compile-time configuration rather than parsing JSON
 - USB serial runs at 115200 baud.
 - The bridge identifies the device with a small ASCII request/response (`LUMEN8:IDENTIFY?` / `LUMEN8:HELLO:1:<firmware-version>`). This is separate from configuration provisioning; no settings are transferred at runtime.
 - Automatic discovery probes USB serial interfaces with USB descriptor metadata. It does not require specific VID/PID values or a particular serial number. Optional VID/PID/serial-number filters can be set in `config/user.json`; a valid LUMEN-8 protocol response is always required.
-- The bridge keeps DTR and RTS inactive while probing, to avoid triggering the reset behavior used by some Arduino boards.
+- The bridge asserts DTR and keeps RTS inactive so native USB CDC firmware can send its identity response.
 - Current-value readback from Lightroom is not implemented.
 - The encoder push switch currently reports a press event; no reset action is assigned yet.
 
 ## Roadmap
 
 - [x] Implement versioned protocol-based USB identification and automatic re-discovery after connection loss
-- [ ] Verify discovery with the physical Pro Micro and at least one alternative USB-capable Arduino
-- [ ] Package the bridge as a macOS `launchd` LaunchAgent: start at login, restart after failures, manage logs, and provide install/uninstall scripts
+- [x] Verify discovery with the physical Pro Micro and at least one alternative USB-capable Arduino
+- [x] Package the bridge as a macOS `launchd` LaunchAgent: start at login, restart after failures, manage logs, and provide install/uninstall scripts
 - [ ] Complete the eight-button perfboard assembly
-- [ ] Validate all eight buttons and encoder adjustments end to end in Lightroom
+- [x] Validate all eight buttons and encoder adjustments end to end in Lightroom
 - [ ] Finalize the enclosure and add printable CAD/STL files
 - [ ] Add assembly photographs and wiring diagrams
 - [ ] Document installation and troubleshooting in more detail
@@ -229,7 +248,7 @@ Run the host-side discovery protocol tests from the repository root:
 python3 -m unittest discover -s tests -v
 ```
 
-These tests cover response parsing, protocol-version rejection, optional USB filters and probe retries. Physical USB reconnection still needs validation with the target hardware.
+These tests cover response parsing, protocol-version rejection, optional USB filters, probe retries, and the LaunchAgent configuration. USB discovery and reconnection have also been checked with the physical Pro Micro and an alternative USB-capable Arduino.
 
 ## Third-party software
 

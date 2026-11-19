@@ -7,15 +7,16 @@
 # ============================================================
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR = Path(os.environ.get("LUMEN8_LOG_DIR", PROJECT_ROOT / "logs")).expanduser()
 LOG_FILE = LOG_DIR / "lumen8.log"
 
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("lumen8")
 logger.setLevel(logging.DEBUG)
@@ -31,17 +32,18 @@ if not logger.handlers:
     )
     file_handler.setLevel(logging.DEBUG)
 
-    # Terminal output: important events only
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
-
     logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    if not os.environ.get("LUMEN8_LOG_DIR"):
+        # Interactive runs also get concise terminal output. LaunchAgent runs
+        # rely on the rotating file so launchd does not create a second,
+        # unbounded copy of every log entry.
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
